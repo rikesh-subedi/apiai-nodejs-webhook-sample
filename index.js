@@ -14,7 +14,9 @@ app.get('/webhook', function (req, res) {
   res.send('You must POST your request')
 })
 
-var userSession = {}
+var foodOrders = {
+
+}
 
 //https://hoo-dy.herokuapp.com/webhook
 app.post('/webhook', function (req, res) {
@@ -40,26 +42,55 @@ app.post('/webhook', function (req, res) {
   // parameters are stored in req.body.result.parameters
   var result = req.body.result
   var intentName = getIntentNameLowerCase(result)
-  var webhookReply = ""
-  var displayText = ""
+  var webhookReply = "We will get back to you shortly."
+  var displayText = webhookReply
   var followupEvent = null
   switch (intentName) {
     case "menu":
       console.log("received menu intent")
       var mealType = paramaterFor(result, "meal")
       var mealPreference = paramaterFor(result, "food-preference");
-      console.log("meal: "+ mealType)
+      console.log("meal: " + mealType)
       console.log("preference: " + mealPreference)
-      webhookReply = getMenu(mealPreference)
+      webhookReply = "Here are the top menu. \n" + getMenu(mealPreference) + "\n Please order any of these:"
       displayText = webhookReply
       followupEvent = {
-      "name": "take_order",
-      "data": {}
-         
+        "name": "take_order",
+        "data": {}
+
       }
       break;
+    case "menu_take_order - yes":
+      console.log(result.contexts)
+
+      var followup = result.contexts.find(function (d) { return d.name == "menu-followup" })
+      if (followup) {
+        var foodPref = followup.parameters["food-preference"]
+        var foodItem = followup.parameters["foodItem"]
+        var meal = followup.parameters["meal"]
+        console.log(foodItem)
+        var currentDate = new Date()
+        console.log(currentDate)
+        var orderId = "" + currentDate.getDay() + currentDate.getHours() + currentDate.getMinutes() + currentDate.getSeconds();
+        foodOrders[orderId] = currentDate
+        webhookReply = "Hi, your order for " + foodItem + " for your " + meal + " is confirmed. Your reference number is " + orderId
+        displayText = webhookReply
+      } else {
+        webhookReply = "Hi we will check and confirm"
+        displayText = webhookReply
+      }
+
+      break
+    case "food.check_status":
+      var orderid = paramaterFor(result, "orderId")
+      console.log("received orderId: " + orderid)
+      var orderStatus = getOrderStatus(orderid)
+      webhookReply = orderStatus ? "your order status is: " + orderStatus : " Sorry could not find your order"
+      displayText = webhookReply
+      break
+
     case "checkin":
-      webhookReply = "Hi,your checkin is successful. Checkin ID: " + (Math.floor(Math.random() * 100000));
+      webhookReply = "Hi, your checkin is successful. Checkin ID: " + (Math.floor(Math.random() * 100000));
       displayText = displayText
     case "welcome user":
       var userName = paramaterFor(result, "given-name");
@@ -70,7 +101,7 @@ app.post('/webhook', function (req, res) {
       break
     default: break;
   }
-  
+
   console.log(webhookReply)
   res.status(200).json({
     source: 'webhook',
@@ -98,20 +129,20 @@ function getIntentNameLowerCase(result) {
 
 function getMenu(mealPreference) {
   console.log("inside getMenu:" + mealPreference);
-  switch(mealPreference) {
+  switch (mealPreference) {
     case "veg":
-        return getVegMeals().join(",")
+      return getVegMeals().join(", ")
     case "non-veg":
-        return getNonVegMeals().join(",")
+      return getNonVegMeals().join(", ")
     case "eggetarian":
-        return getEggMeals().join(",")
+      return getEggMeals().join(", ")
     default:
-        return getVegMeals().concat(getNonVegMeals()).concat(getEggMeals()).join(",")
+      return getVegMeals().concat(getNonVegMeals()).concat(getEggMeals()).join(",")
   }
 
 }
 
-function getVegMeals(){
+function getVegMeals() {
   return ["paneer", "kofta"]
 }
 
@@ -122,4 +153,37 @@ function getNonVegMeals() {
 
 function getEggMeals() {
   return ["egg curry"]
+}
+
+function getOrderStatus(orderId) {
+  var orderStatuses = [
+    "order received",
+    "preparing",
+    "garnishing",
+    "on the way",
+    "deliveried",
+  ]
+
+  var orderedDate = foodOrders[orderId]
+  console.log("order was made on " + orderedDate)
+  var nowDate = new Date()
+  if (orderedDate) {
+    var secondDiff = Math.floor((nowDate.getTime() - orderedDate.getTime()) / 1000 / 30)
+    console.log("order was ordered "+ secondDiff + " seconds ago")
+    var status = orderStatuses[secondDiff]
+    if (status) { return status }
+
+    if (secondDiff > 0) {
+      return orderStatuses[5]
+    } else {
+      return orderStatuses[0]
+    }
+  } else {
+    return null
+  }
+
+
+
+
+
 }
