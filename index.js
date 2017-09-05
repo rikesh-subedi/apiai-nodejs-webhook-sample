@@ -85,10 +85,10 @@ app.post('/webhook', function (req, res) {
 
       var menuFollowup = result.contexts.find(function (d) { return d.name == "menu-followup" })
       var menuTakeOrderFollowup = result.contexts.find(function (d) { return d.name == "menu_take_order-followup" })
-      if (followup) {
-        var foodPref = followup.parameters["food-preference"]
-        var foodItem = followup.parameters["foodItem"]
-        var meal = followup.parameters["meal"]
+      if (menuFollowup) {
+        var foodPref = menuFollowup.parameters["food-preference"]
+        var foodItem = menuFollowup.parameters["foodItem"]
+        var meal = menuFollowup.parameters["meal"]
         console.log(foodItem)
         var currentDate = new Date()
         console.log(currentDate)
@@ -101,23 +101,48 @@ app.post('/webhook', function (req, res) {
         sessionData[sessionId].foodOrders.push(orderObj)
         webhookReply = "Hi, your order for " + foodItem + " for your " + meal + " is confirmed. Your reference number is " + orderId
         displayText = webhookReply
-      } else {
-        webhookReply = "Hi we will check and confirm"
-        displayText = webhookReply
+        break;
+      } 
+
+      if(menuTakeOrderFollowup) {
+
+
       }
 
       break
     case "food.check_status":
       var orderid = paramaterFor(result, "order-ID")
+      
+      orderid = orderid.replace(/\W/g, '')
       console.log("received orderId: " + orderid)
       var orderStatus = getOrderStatus(orderid)
       webhookReply = orderStatus ? "your order status is: " + orderStatus : " Sorry could not find your order"
       displayText = webhookReply
       break
-
+    case "hotel-need":
+      var item = paramaterFor(result, "HotelItem")
+      webhookReply = "" + item + " will be provided within 30 minutes"
+      displayText = webhookReply
+      break
+    case "hotel-repair":
+      var item = paramaterFor(result, "HotelItem")
+      var yesno = paramaterFor(result, "yesno") || ""
+      webhookReply = yesno == "no" ? "Sorry for inconvenience. I will fetch a guy to repair your "+ item : "Is there any problem with your " + item
+      displayText = webhookReply
+      break
     case "checkin":
       webhookReply = "Hi, your checkin is successful. Checkin ID: " + (Math.floor(Math.random() * 100000));
       displayText = displayText
+      break
+    case "checkin_booking_id":
+      var bookingId = paramaterFor(result, "otp")
+      if(bookingId){
+        webhookReply = "Hi, your checkin is successful. Checkin ID: " + (Math.floor(Math.random() * 100000));
+        displayText = displayText
+        
+      }
+      break
+    
     case "welcome user":
       var userName = paramaterFor(result, "given-name");
       //webhookReply = 'Hello ' + userName + '! Welcome from the webhook.'
@@ -159,6 +184,7 @@ function getMenu(mealPreference) {
   console.log("inside getMenu:" + mealPreference);
   switch (mealPreference) {
     case "veg":
+    case "vegeterian":
       return getVegMeals().join(", ")
     case "non-veg":
       return getNonVegMeals().join(", ")
@@ -189,7 +215,7 @@ function getOrderStatus(orderId) {
     "preparing",
     "garnishing",
     "on the way",
-    "deliveried",
+    "delivered",
   ]
 
   var orderedDate = foodOrders[orderId]
