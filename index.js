@@ -18,6 +18,14 @@ var foodOrders = {
 
 }
 
+var sessionData = {
+
+}
+
+var userData = {
+
+}
+
 //https://hoo-dy.herokuapp.com/webhook
 app.post('/webhook', function (req, res) {
   // we expect to receive JSON data from api.ai here.
@@ -41,6 +49,18 @@ app.post('/webhook', function (req, res) {
 
   // parameters are stored in req.body.result.parameters
   var result = req.body.result
+  var orginalRequest = req.body.originalRequest
+  var sessionId = req.body.sessionId
+  if(!sessionData[sessionId]){
+    sessionData[sessionId] = {}
+    sessionData[sessionId].foodOrders = []
+  }
+
+  if(orginalRequest) {
+    var activeUserId = orginalRequest.data.user.userId
+    userData[activeUserId] = sessionId
+    sessionData[sessionId].userId = activeUserId
+  }
   var intentName = getIntentNameLowerCase(result)
   var webhookReply = "We will get back to you shortly."
   var displayText = webhookReply
@@ -63,7 +83,8 @@ app.post('/webhook', function (req, res) {
     case "menu_take_order - yes":
       console.log(result.contexts)
 
-      var followup = result.contexts.find(function (d) { return d.name == "menu-followup" })
+      var menuFollowup = result.contexts.find(function (d) { return d.name == "menu-followup" })
+      var menuTakeOrderFollowup = result.contexts.find(function (d) { return d.name == "menu_take_order-followup" })
       if (followup) {
         var foodPref = followup.parameters["food-preference"]
         var foodItem = followup.parameters["foodItem"]
@@ -73,6 +94,11 @@ app.post('/webhook', function (req, res) {
         console.log(currentDate)
         var orderId = "" + currentDate.getDay() + currentDate.getHours() + currentDate.getMinutes() + currentDate.getSeconds();
         foodOrders[orderId] = currentDate
+        var orderObj = {
+          orderId: orderId,
+          food: foodItem
+        }
+        sessionData[sessionId].foodOrders.push(orderObj)
         webhookReply = "Hi, your order for " + foodItem + " for your " + meal + " is confirmed. Your reference number is " + orderId
         displayText = webhookReply
       } else {
@@ -82,7 +108,7 @@ app.post('/webhook', function (req, res) {
 
       break
     case "food.check_status":
-      var orderid = paramaterFor(result, "orderId")
+      var orderid = paramaterFor(result, "order-ID")
       console.log("received orderId: " + orderid)
       var orderStatus = getOrderStatus(orderid)
       webhookReply = orderStatus ? "your order status is: " + orderStatus : " Sorry could not find your order"
@@ -103,6 +129,8 @@ app.post('/webhook', function (req, res) {
   }
 
   console.log(webhookReply)
+  console.log(userData)
+  console.log(sessionData)
   res.status(200).json({
     source: 'webhook',
     speech: webhookReply,
@@ -174,7 +202,7 @@ function getOrderStatus(orderId) {
     if (status) { return status }
 
     if (secondDiff > 0) {
-      return orderStatuses[5]
+      return orderStatuses[4]
     } else {
       return orderStatuses[0]
     }
